@@ -1,0 +1,62 @@
+---
+
+- name: Installing and configuring the environment
+  hosts: "{{ BUILD_NODE_IP }}"
+  tasks:
+    - name: Installing Packages
+      apt:
+        name:
+          - default-jdk
+          - tomcat9
+          - git
+          - maven        
+        state: present
+
+    - name: Installing Docker
+      apt:
+        name: docker.io
+        state: present
+
+- name: Building a project
+  hosts: "{{ BUILD_NODE_IP }}"
+  tasks:
+    - name: Cloning a repository
+      git:
+        repo: https://github.com/boxfuse/boxfuse-sample-java-war-hello.git
+        dest: /home/asderbin/
+      register: git_clone_status
+
+    - name: Building a project
+      command: mvn package 
+      args:
+         chdir: /home/asderbin/
+      register: build_status
+      changed_when: False
+
+    - name: Packaging the application
+      copy:
+        src: /home/asderbin/target/hello-1.0.war
+        dest: /home/asderbin/hello.war
+
+- name: Project Deployment
+  hosts: "{{ APP_NODE_IP }}"
+  tasks:
+    - name: Installing Docker
+      apt:
+        name: docker.io
+        state: present
+   
+- name: Building and Running Dockerized Application
+  hosts: "{{ APP_NODE_IP }}"
+  tasks:
+    - name: Building Docker Image
+      docker_image:
+        name: boxfuse
+        path: /home/asderbin/
+        dockerfile: /home/asderbin/Dockerfile
+
+    - name: Running Docker Container
+      docker_container:
+        name: myapp
+        image: boxfuse
+        state: started
